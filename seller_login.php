@@ -5,12 +5,10 @@ require_once 'config.php';
 if (isSellerLoggedIn()) { header('Location: dashboard.php'); exit; }
 
 $error = '';
-//Cek akses atau request masuk 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email    = trim($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
     if ($email && $password) {
-        // Siapkan query database 
         $stmt = $conn->prepare("SELECT id, nama, password, status FROM sellers WHERE email = ?");
         $stmt->bind_param('s', $email);
         $stmt->execute();
@@ -43,10 +41,9 @@ $conn->close();
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:'Nunito',sans-serif;background:#0a0a0a;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
 .box{background:#111;border:1px solid #222;width:100%;max-width:400px;padding:40px;}
-.logo{font-family:'Oxanium',sans-serif;font-weight:800;font-size:1.1rem;color:#fff;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:32px;display:flex;align-items:center;gap:10px;text-decoration:none;}
-.logo-icon{width:36px;height:36px;border-radius:10px;background:transparent;box-shadow:0 10px 24px rgba(55,32,20,0.25);display:flex;align-items:center;justify-content:center;font-size:16px;overflow:hidden;}
-.logo-icon img{width:100%;height:100%;object-fit:contain;display:block;background:transparent;}
-.logo .sub{color:#9fbeaa;font-size:11px;display:block;font-weight:400;}
+.logo{font-family:'Oxanium',sans-serif;font-weight:800;font-size:1.1rem;color:#fff;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:32px;display:flex;align-items:center;gap:10px;}
+.logo-icon{width:36px;height:36px;background:#fff;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:16px;}
+.logo .sub{color:#666;font-size:11px;display:block;font-weight:400;}
 h1{font-family:'Oxanium',sans-serif;font-weight:800;font-size:1.5rem;color:#fff;margin-bottom:6px;}
 .sub-text{font-size:13px;color:#555;margin-bottom:28px;}
 .field{margin-bottom:18px;}
@@ -65,8 +62,8 @@ h1{font-family:'Oxanium',sans-serif;font-weight:800;font-size:1.5rem;color:#fff;
 <body>
 <div class="box">
   <div class="logo">
-    <div class="logo-icon"><img src="assets/img/logosmkn-transparent.png" alt="SMKN 1 Surabaya"></div>
-    <div><span>SMKN 1 SURABAYA</span><span class="sub">Kantin</span></div>
+    <div class="logo-icon">🍽️</div>
+    <div><span>Seller</span><span class="sub">Dashboard</span></div>
   </div>
   <h1>Seller Login</h1>
   <p class="sub-text">Masuk ke dashboard penjual</p>

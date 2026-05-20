@@ -3,12 +3,10 @@ if (session_status() === PHP_SESSION_NONE) session_start();
 require_once 'config.php';
 
 // Cek login owner
-// -- Cek akses atau request masuk
 if (!isset($_SESSION['owner_id'])) { header('Location: login.php'); exit; }
 $owner_id = (int)$_SESSION['owner_id'];
 
 // Pastikan tabel profil owner tersedia
-// Pastikan struktur tabel tersedia 
 $conn->query("CREATE TABLE IF NOT EXISTS owner_profiles (
   owner_id INT PRIMARY KEY,
   tanggal_lahir DATE NULL,
@@ -46,7 +44,6 @@ $defaultProfilePreview = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/200
 $sellers_pending = [];
 $sellers_active  = [];
 $sellers_rejected = [];
-// -- Ambil data dari database --
 $r = $conn->query("SELECT s.*, COUNT(st.id) as total_stands FROM sellers s LEFT JOIN stands st ON st.seller_id = s.id GROUP BY s.id ORDER BY s.created_at DESC");
 while ($row = $r->fetch_assoc()) {
     if ($row['status'] === 'pending')  $sellers_pending[]  = $row;
@@ -61,9 +58,44 @@ while ($row = $r->fetch_assoc()) $users[] = $row;
 
 // ── Data stands ──
 $stands = [];
-// ambil data dari database
 $r = $conn->query("SELECT s.*, sl.nama as seller_nama, COUNT(m.id) as total_menu FROM stands s LEFT JOIN sellers sl ON sl.id = s.seller_id LEFT JOIN menu_items m ON m.stand_id = s.id GROUP BY s.id ORDER BY s.id DESC");
 while ($row = $r->fetch_assoc()) $stands[] = $row;
+
+$conn->query("CREATE TABLE IF NOT EXISTS rating_replies (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    rating_id INT NOT NULL,
+    rating_type VARCHAR(10) NOT NULL,
+    seller_id INT NOT NULL,
+    reply_text TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    KEY idx_rating_id (rating_id),
+    KEY idx_seller_id (seller_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+$all_ratings = [];
+$r = $conn->query("
+    SELECT 'stand' as rating_type, rs.id as rating_id, rs.rating, rs.user_id, u.nama as user_nama, 
+           s.nama as stand_nama, s.seller_id, sl.nama as seller_nama, rs.created_at, 
+           rr.reply_text, rr.updated_at as reply_date
+    FROM ratings_stand rs
+    JOIN users u ON u.id = rs.user_id
+    JOIN stands s ON s.id = rs.stand_id
+    LEFT JOIN sellers sl ON sl.id = s.seller_id
+    LEFT JOIN rating_replies rr ON rr.rating_id = rs.id AND rr.rating_type = 'stand'
+    UNION ALL
+    SELECT 'menu' as rating_type, rm.id as rating_id, rm.rating, rm.user_id, u.nama as user_nama, 
+           s.nama as stand_nama, s.seller_id, sl.nama as seller_nama, rm.created_at, 
+           rr.reply_text, rr.updated_at as reply_date
+    FROM ratings_menu rm
+    JOIN users u ON u.id = rm.user_id
+    JOIN menu_items mi ON mi.id = rm.menu_id
+    JOIN stands s ON s.id = mi.stand_id
+    LEFT JOIN sellers sl ON sl.id = s.seller_id
+    LEFT JOIN rating_replies rr ON rr.rating_id = rm.id AND rr.rating_type = 'menu'
+    ORDER BY created_at DESC
+");
+while ($row = $r->fetch_assoc()) $all_ratings[] = $row;
 
 // ── Stats ──
 $total_users    = count($users);
@@ -244,25 +276,6 @@ body.light-theme .hamburger-btn span{background:#0f172a;}
 .notify.show{opacity:1;}
 .notify.ok{background:#052e16;color:#86efac;border:1px solid #14532d;}
 .notify.err{background:#2a0b0b;color:#ffb4b4;border:1px solid #4a1a1a;}
-/* CONFIRM POPUP */
-.confirm-popup-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:none;align-items:center;justify-content:center;z-index:998;animation:overlayFadeIn 0.2s ease-out;}
-.confirm-popup-overlay.show{display:flex;}
-.confirm-popup{background:#111827;border:1px solid #1f2937;border-radius:8px;padding:28px;max-width:420px;width:90%;box-shadow:0 10px 40px rgba(0,0,0,0.4);animation:modalIn 0.28s cubic-bezier(0.2,0.9,0.2,1);}
-.confirm-popup-title{font-weight:700;font-size:1rem;color:#f9fafb;margin-bottom:16px;}
-.confirm-popup-msg{font-size:13px;color:#d1d5db;margin-bottom:24px;line-height:1.5;}
-.confirm-popup-buttons{display:flex;gap:12px;justify-content:flex-end;}
-.confirm-popup-btn{padding:10px 18px;font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;border:1px solid #1f2937;cursor:pointer;transition:all 0.2s;border-radius:4px;}
-.confirm-popup-btn.confirm{background:linear-gradient(135deg,#4b601d,#6f8a34);color:#fff;border-color:#6f8a34;}
-.confirm-popup-btn.confirm:hover{filter:brightness(1.06);}
-.confirm-popup-btn.cancel{background:#111827;color:#cbd5e1;border-color:#1f2937;}
-.confirm-popup-btn.cancel:hover{background:#1f2937;color:#f9fafb;}
-@keyframes overlayFadeIn{from{opacity:0;}to{opacity:1;}}
-@keyframes modalIn{from{opacity:0;transform:scale(0.95);}to{opacity:1;transform:scale(1);}}
-body.light-theme .confirm-popup{background:#ffffff;border-color:#d7dde5;}
-body.light-theme .confirm-popup-title{color:#0f172a;}
-body.light-theme .confirm-popup-msg{color:#475569;}
-body.light-theme .confirm-popup-btn.cancel{background:#f8fafc;color:#0f172a;border-color:#d7dde5;}
-body.light-theme .confirm-popup-btn.cancel:hover{background:#eef2f6;color:#1f2937;}
 /* MOBILE MENU TOGGLE */
 .hamburger-btn{display:none;flex-direction:column;gap:5px;cursor:pointer;background:none;border:none;padding:8px;color:#f9fafb;position:absolute;left:12px;top:14px;z-index:51;}
 .hamburger-btn span{display:block;width:24px;height:2px;background:#f9fafb;transition:all 0.3s;}
@@ -308,6 +321,9 @@ body.light-theme .confirm-popup-btn.cancel:hover{background:#eef2f6;color:#1f293
     </div>
     <div class="nav-item" data-section="stands" onclick="showSection('stands',this)">
       <span class="nav-icon"></span> Stands
+    </div>
+    <div class="nav-item" data-section="ratings" onclick="showSection('ratings',this)">
+      <span class="nav-icon"></span> Ratings & Replies
     </div>
     <div class="nav-item" data-section="setting" onclick="showSection('setting',this)">
       <span class="nav-icon"></span> Pengaturan
@@ -520,6 +536,53 @@ body.light-theme .confirm-popup-btn.cancel:hover{background:#eef2f6;color:#1f293
       </table>
     </div>
 
+    <!-- ══ RATINGS & REPLIES ══ -->
+    <div class="section" id="section-ratings">
+      <div class="section-header">
+        <div class="section-title">Monitoring Ratings & Seller Replies</div>
+        <span style="font-family:'Oxanium',sans-serif;font-size:11px;color:#333;"><?= count($all_ratings) ?> rating</span>
+      </div>
+      
+      <?php if (empty($all_ratings)): ?>
+        <div class="empty-row" style="text-align:center;padding:40px;color:#333;">BELUM ADA RATINGS</div>
+      <?php else: ?>
+        <div style="display:grid;gap:14px;">
+          <?php foreach ($all_ratings as $rating): 
+            $hasReply = !empty($rating['reply_text']);
+          ?>
+          <div style="background:#111827;border:1px solid #1f2937;padding:16px;border-left:4px solid <?= $hasReply ? '#6f8a34' : '#ff6b6b' ?>;">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px;">
+              <div>
+                <div style="font-weight:700;color:#f9fafb;font-size:13px;"><?= htmlspecialchars($rating['user_nama']) ?></div>
+                <div style="font-size:11px;color:#9ca3af;margin-top:4px;">Stand: <?= htmlspecialchars($rating['stand_nama']) ?></div>
+                <div style="font-size:11px;color:#9ca3af;">Seller: <?= htmlspecialchars($rating['seller_nama'] ?? 'N/A') ?></div>
+              </div>
+              <div style="text-align:right;">
+                <div style="font-size:13px;margin-bottom:4px;">
+                  <?= str_repeat('★', $rating['rating']) ?><span style="color:#444"><?= str_repeat('★', 5 - $rating['rating']) ?></span>
+                </div>
+                <div style="font-size:10px;color:#64748b;"><?= date('d M Y', strtotime($rating['created_at'])) ?></div>
+              </div>
+            </div>
+            
+            <!-- Seller Reply Status -->
+            <?php if ($hasReply): ?>
+              <div style="background:#0f172a;border-left:3px solid #6f8a34;padding:12px;margin-bottom:12px;">
+                <div style="font-size:10px;color:#86a84a;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;">✓ Seller Sudah Balas</div>
+                <div style="font-size:12px;color:#d1d5db;line-height:1.5;"><?= htmlspecialchars($rating['reply_text']) ?></div>
+                <div style="font-size:9px;color:#64748b;margin-top:6px;">Diupdate: <?= date('d M Y H:i', strtotime($rating['reply_date'])) ?></div>
+              </div>
+            <?php else: ?>
+              <div style="background:#2a0b0b;border-left:3px solid #ff6b6b;padding:12px;margin-bottom:12px;">
+                <div style="font-size:10px;color:#ffb4b4;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;">⚠ Seller Belum Balas</div>
+              </div>
+            <?php endif; ?>
+          </div>
+          <?php endforeach; ?>
+        </div>
+      <?php endif; ?>
+    </div>
+
     <!-- ══ SETTING ══ -->
     <div class="section" id="section-setting">
       <div class="section-header"><div class="section-title">Setting Biodata Owner</div></div>
@@ -588,21 +651,9 @@ body.light-theme .confirm-popup-btn.cancel:hover{background:#eef2f6;color:#1f293
 <!-- NOTIFY -->
 <div class="notify" id="notify"></div>
 
-<!-- CONFIRM POPUP -->
-<div class="confirm-popup-overlay" id="confirmPopupOverlay">
-  <div class="confirm-popup">
-    <div class="confirm-popup-title">Konfirmasi</div>
-    <div class="confirm-popup-msg" id="confirmPopupMsg"></div>
-    <div class="confirm-popup-buttons">
-      <button class="confirm-popup-btn cancel" onclick="closeConfirmPopup()">Batal</button>
-      <button class="confirm-popup-btn confirm" onclick="confirmPopupAction()">Lanjutkan</button>
-    </div>
-  </div>
-</div>
-
 <script>
 // ── SECTION NAV ──
-const sectionTitles = {overview:'Overview', sellers:'Manajemen Sellers', users:'Semua Users', stands:'Semua Stands', setting:'Setting Biodata'};
+const sectionTitles = {overview:'Overview', sellers:'Manajemen Sellers', users:'Semua Users', stands:'Semua Stands', ratings:'Monitoring Ratings & Replies', setting:'Setting Biodata'};
 const THEME_KEY = 'owner_panel_theme_<?= $owner_id ?>';
 
 function applyTheme(mode) {
@@ -657,31 +708,6 @@ function showNotify(msg, type) {
   setTimeout(() => el.classList.remove('show'), 3000);
 }
 
-// ── CONFIRM POPUP ──
-let confirmPopupCallback = null;
-function showConfirmPopup(msg, onConfirm) {
-  confirmPopupCallback = onConfirm;
-  document.getElementById('confirmPopupMsg').textContent = msg;
-  document.getElementById('confirmPopupOverlay').classList.add('show');
-}
-function confirmPopupAction() {
-  if (confirmPopupCallback) confirmPopupCallback();
-  closeConfirmPopup();
-}
-function closeConfirmPopup() {
-  document.getElementById('confirmPopupOverlay').classList.remove('show');
-  confirmPopupCallback = null;
-}
-// Close popup on overlay click or Escape key
-document.getElementById('confirmPopupOverlay').addEventListener('click', (e) => {
-  if (e.target.id === 'confirmPopupOverlay') closeConfirmPopup();
-});
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && document.getElementById('confirmPopupOverlay').classList.contains('show')) {
-    closeConfirmPopup();
-  }
-});
-
 // ── HAMBURGER MENU ──
 const hambtn = document.getElementById('sidebarToggle');
 const sidebar = document.querySelector('.sidebar');
@@ -723,39 +749,36 @@ function apiPost(url, data, onSuccess) {
 // ── SELLER ACTIONS ──
 function updateSeller(id, status) {
   const label = status === 'active' ? 'approve' : (status === 'rejected' ? 'reject/suspend' : '');
-  showConfirmPopup(`${label} seller ini?`, () => {
-    apiPost('api/owner_action.php', { action:'update_seller', id, status }, d => {
-      showNotify(d.message, 'ok');
-      document.querySelectorAll(`#seller-row-${id}`).forEach(r => r.remove());
-    });
+  if (!confirm(`${label} seller ini?`)) return;
+  apiPost('api/owner_action.php', { action:'update_seller', id, status }, d => {
+    showNotify(d.message, 'ok');
+    // Hapus row & reload ringan
+    document.querySelectorAll(`#seller-row-${id}`).forEach(r => r.remove());
   });
 }
 function deleteSeller(id) {
-  showConfirmPopup('Hapus akun seller ini? Semua stand-nya juga akan terhapus!', () => {
-    apiPost('api/owner_action.php', { action:'delete_seller', id }, d => {
-      showNotify(d.message, 'ok');
-      document.querySelectorAll(`#seller-row-${id}`).forEach(r => r.remove());
-    });
+  if (!confirm('Hapus akun seller ini? Semua stand-nya juga akan terhapus!')) return;
+  apiPost('api/owner_action.php', { action:'delete_seller', id }, d => {
+    showNotify(d.message, 'ok');
+    document.querySelectorAll(`#seller-row-${id}`).forEach(r => r.remove());
   });
 }
 
 // ── USER ACTIONS ──
 function deleteUser(id) {
-  showConfirmPopup('Hapus akun user ini?', () => {
-    apiPost('api/owner_action.php', { action:'delete_user', id }, d => {
-      showNotify(d.message, 'ok');
-      document.getElementById(`user-row-${id}`).remove();
-    });
+  if (!confirm('Hapus akun user ini?')) return;
+  apiPost('api/owner_action.php', { action:'delete_user', id }, d => {
+    showNotify(d.message, 'ok');
+    document.getElementById(`user-row-${id}`).remove();
   });
 }
 
 // ── STAND ACTIONS ──
 function deleteStand(id) {
-  showConfirmPopup('Hapus stand ini?', () => {
-    apiPost('api/owner_action.php', { action:'delete_stand', id }, d => {
-      showNotify(d.message, 'ok');
-      document.getElementById(`stand-row-${id}`).remove();
-    });
+  if (!confirm('Hapus stand ini?')) return;
+  apiPost('api/owner_action.php', { action:'delete_stand', id }, d => {
+    showNotify(d.message, 'ok');
+    document.getElementById(`stand-row-${id}`).remove();
   });
 }
 

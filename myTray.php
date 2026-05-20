@@ -5,7 +5,6 @@ require_once 'config.php';
 $user = currentUser();
 $isLoggedIn = isLoggedIn();
 
-// -- Pastikan struktur tabel tersedia --
 $conn->query("CREATE TABLE IF NOT EXISTS tray_items (
 	id INT AUTO_INCREMENT PRIMARY KEY,
 	user_id INT NOT NULL,
@@ -17,7 +16,6 @@ $conn->query("CREATE TABLE IF NOT EXISTS tray_items (
 	KEY idx_user_id (user_id),
 	KEY idx_menu_id (menu_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-// -- Siapkan query database --
 
 $stmt = $conn->prepare(
 		"SELECT
@@ -51,7 +49,7 @@ if ($stmt && $isLoggedIn) {
 				$trayItems[] = $row;
 		}
 } else {
-		//kosong 
+		//kosong ngwneorhjd
 		foreach ($trayItems as $item) {
 				$subtotal += $item['line_total'];
 		}
@@ -114,19 +112,12 @@ nav {
 	width: 36px;
 	height: 36px;
 	border-radius: 10px;
+	background: linear-gradient(160deg, #23310d, #4b601d);
 	box-shadow: 0 10px 24px rgba(55, 32, 20, 0.25);
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	font-size: 16px;
-	background: transparent;
-}
-.logo-icon img {
-	width: 100%;
-	height: 100%;
-	object-fit: contain;
-	display: block;
-	background: transparent;
 }
 .nav-logo .sub { color: #6e7884; }
 .nav-links { display: flex; align-items: center; gap: 34px; list-style: none; }
@@ -333,73 +324,102 @@ nav {
 	box-shadow: 0 6px 16px rgba(75, 96, 29, 0.3);
 	filter: brightness(1.05);
 }
-.checkout-modal-overlay {
+
+/* SELLER MODAL */
+.modal-overlay {
+	display: none;
 	position: fixed;
 	inset: 0;
-	z-index: 300;
-	display: none;
+	background: rgba(0,0,0,0.6);
+	z-index: 999;
 	align-items: center;
 	justify-content: center;
 	padding: 20px;
-	background: rgba(0, 0, 0, 0.72);
-	backdrop-filter: blur(8px);
-	animation: overlayFadeIn 0.2s ease both;
 }
-.checkout-modal-overlay.open { display: flex; }
-.checkout-modal {
-	width: min(100%, 490px);
+.modal-overlay.open {
+	display: flex;
+}
+.modal-content {
 	background: #ffffff;
-	border-radius: 18px;
-	box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
-	overflow: hidden;
-	transform-origin: center;
-	animation: checkoutPop 0.28s cubic-bezier(0.2, 0.9, 0.2, 1) both;
+	border-radius: 12px;
+	width: 100%;
+	max-width: 500px;
+	max-height: 80vh;
+	overflow-y: auto;
+	padding: 28px;
+	box-shadow: 0 20px 60px rgba(0,0,0,0.3);
 }
-.checkout-modal-inner {
-	padding: 30px 26px 26px;
-	text-align: center;
-}
-.checkout-modal-title {
+.modal-title {
 	font-family: 'Space Grotesk', sans-serif;
 	font-size: 24px;
-	line-height: 1.25;
-	font-weight: 800;
-	color: #2f3a2c;
-	margin-bottom: 24px;
-}
-.checkout-modal-actions {
+	font-weight: 700;
+	color: #2b2b2b;
+	margin-bottom: 20px;
 	display: flex;
+	align-items: center;
+	justify-content: space-between;
+}
+.modal-close {
+	background: none;
+	border: none;
+	font-size: 24px;
+	color: #888;
+	cursor: pointer;
+	padding: 0;
+	width: 28px;
+	height: 28px;
+	display: flex;
+	align-items: center;
 	justify-content: center;
 }
-.checkout-cancel {
-	min-width: 176px;
-	border: none;
-	border-radius: 14px;
-	background: #e53935;
-	color: #ffffff;
-	font-family: 'Space Grotesk', sans-serif;
-	font-size: 16px;
+.seller-item {
+	background: #f8f8f8;
+	border: 1px solid #ebebeb;
+	border-radius: 8px;
+	padding: 16px;
+	margin-bottom: 12px;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+}
+.seller-info {
+	flex: 1;
+}
+.seller-name {
 	font-weight: 700;
-	padding: 16px 24px;
+	font-size: 14px;
+	color: #2f2f2f;
+}
+.seller-meta {
+	font-size: 11px;
+	color: #8c8c8c;
+	margin-top: 4px;
+}
+.seller-actions {
+	display: flex;
+	gap: 8px;
+}
+.btn-seller {
+	padding: 6px 12px;
+	border: 1px solid #4b601d;
+	background: linear-gradient(135deg, #4b601d, #6f8a34);
+	color: #fff;
+	border-radius: 4px;
+	font-size: 10px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
 	cursor: pointer;
-	/* box-shadow: 0 10px 22px rgba(229, 57, 53, 0.28); */
-	transition: transform 0.18s ease, filter 0.18s ease, box-shadow 0.18s ease;
+	transition: all 0.2s;
+	text-decoration: none;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
 }
-.checkout-cancel:hover {
+.btn-seller:hover {
 	transform: translateY(-1px);
-	filter: brightness(1.02);
-	color: #e53935;
-	background: #ffffff;
-	box-shadow: 0 10px px #e53935;
-}
-.checkout-cancel:active { transform: translateY(0); }
-@keyframes checkoutPop {
-	0% { opacity: 0; transform: scale(0.84) translateY(14px); }
-	100% { opacity: 1; transform: scale(1) translateY(0); }
-}
-@keyframes overlayFadeIn {
-	from { opacity: 0; }
-	to { opacity: 1; }
+	box-shadow: 0 4px 8px rgba(75, 96, 29, 0.2);
 }
 .tray-empty {
 	padding: 24px 12px;
@@ -435,29 +455,14 @@ nav {
 	.price { min-width: 0; }
 	.summary { width: 100%; }
 	.btn-checkout { width: 100%; }
-	.checkout-modal {
-		max-width: 92vw;
-	}
-	.checkout-modal-inner {
-		padding: 24px 18px 20px;
-	}
-	.checkout-modal-title {
-		font-size: 18px;
-		margin-bottom: 18px;
-	}
-	.checkout-cancel {
-		min-width: 150px;
-		font-size: 14px;
-		padding: 14px 18px;
-	}
 }
 </style>
 </head>
 <body>
 <nav>
 	<a href="index.php" class="nav-logo">
-		<div class="logo-icon"><img src="assets/img/logosmkn-transparent.png" alt="SMKN 1 Surabaya"></div>
-		<div><div>SMKN 1 SURABAYA</div><div class="sub">Kantin</div></div>
+		<div class="logo-icon">🍽️</div>
+		<div><div>School</div><div class="sub">Cafeteria</div></div>
 	</a>
 	<ul class="nav-links">
 		<li><a href="index.php">Home</a></li>
@@ -486,6 +491,20 @@ nav {
 	<?php else: ?>
 		<a href="login.php" class="btn-join">Login</a>
 	<?php endif; ?>
+</div>
+
+<!-- SELLER MODAL -->
+<div class="modal-overlay" id="sellerModal">
+	<div class="modal-content">
+		<div class="modal-title">
+			Sellers di Order Kamu
+			<button class="modal-close" onclick="closeSellersModal()">✕</button>
+		</div>
+		<div id="sellersList"></div>
+		<div style="margin-top:20px;text-align:center;">
+			<button onclick="proceedCheckout()" style="padding:10px 20px;background:linear-gradient(135deg,#4b601d,#6f8a34);color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer;letter-spacing:0.08em;text-transform:uppercase;">Lanjut Checkout</button>
+		</div>
+	</div>
 </div>
 
 <main class="tray-shell">
@@ -540,17 +559,6 @@ nav {
 	</section>
 </main>
 
-<div class="checkout-modal-overlay" id="checkoutModalOverlay" aria-hidden="true">
-	<div class="checkout-modal" role="dialog" aria-modal="true" aria-labelledby="checkoutModalTitle">
-		<div class="checkout-modal-inner">
-			<div class="checkout-modal-title" id="checkoutModalTitle">Beli langsung ke orangnya yah :) #denganNadaLembut</div>
-			<div class="checkout-modal-actions">
-				<button type="button" class="checkout-cancel" id="checkoutCancelBtn">Batalkan</button>
-			</div>
-		</div>
-	</div>
-</div>
-
 <script>
 const hamburger = document.getElementById('hamburger');
 const mobileMenu = document.getElementById('mobileMenu');
@@ -569,28 +577,6 @@ const rupiah = (v) => 'Rp' + Number(v).toLocaleString('id-ID');
 const summaryBox = document.getElementById('summaryBox');
 const checkoutWrap = document.getElementById('checkoutWrap');
 const IS_LOGGED_IN = <?= $isLoggedIn ? 'true' : 'false' ?>;
-const checkoutModalOverlay = document.getElementById('checkoutModalOverlay');
-const checkoutCancelBtn = document.getElementById('checkoutCancelBtn');
-
-function openCheckoutModal() {
-	checkoutModalOverlay.classList.add('open');
-	checkoutModalOverlay.setAttribute('aria-hidden', 'false');
-	document.body.style.overflow = 'hidden';
-}
-
-function closeCheckoutModal() {
-	checkoutModalOverlay.classList.remove('open');
-	checkoutModalOverlay.setAttribute('aria-hidden', 'true');
-	document.body.style.overflow = '';
-}
-
-checkoutCancelBtn.addEventListener('click', closeCheckoutModal);
-checkoutModalOverlay.addEventListener('click', (e) => {
-	if (e.target === checkoutModalOverlay) closeCheckoutModal();
-});
-document.addEventListener('keydown', (e) => {
-	if (e.key === 'Escape') closeCheckoutModal();
-});
 
 function setSummary(summary) {
 	document.getElementById('subtotal').textContent = rupiah(summary.subtotal);
@@ -729,8 +715,93 @@ function recalculateLocalSummary() {
 
 // Checkout button
 document.querySelector('.btn-checkout').addEventListener('click', () => {
-	openCheckoutModal();
+	if (!IS_LOGGED_IN) {
+		alert('Login dulu untuk checkout!');
+		window.location = 'login.php';
+		return;
+	}
+	
+	// Get unique sellers from tray items
+	const sellers = new Map();
+	document.querySelectorAll('.tray-item').forEach((row) => {
+		const itemMeta = row.querySelector('.item-meta').textContent; // "Stand kategori - stand_nama"
+		const parts = itemMeta.split(' - ');
+		if (parts.length >= 2) {
+			const standNama = parts[parts.length - 1].trim();
+			if (!sellers.has(standNama)) {
+				sellers.set(standNama, {
+					nama: standNama,
+					items: 0
+				});
+			}
+			sellers.get(standNama).items++;
+		}
+	});
+	
+	if (sellers.size === 0) {
+		alert('Tidak ada seller dalam tray');
+		return;
+	}
+	
+	// Display sellers modal
+	showSellersModal(Array.from(sellers.values()));
 });
+
+function showSellersModal(sellers) {
+	const sellersList = document.getElementById('sellersList');
+	sellersList.innerHTML = '';
+	
+	sellers.forEach((seller) => {
+		const sellerHtml = `
+			<div class="seller-item">
+				<div class="seller-info">
+					<div class="seller-name">${seller.nama}</div>
+					<div class="seller-meta">${seller.items} item dalam order</div>
+				</div>
+				<div class="seller-actions">
+					<a href="page2.php#" class="btn-seller" onclick="return true;">Lihat Produk</a>
+				</div>
+			</div>
+		`;
+		sellersList.innerHTML += sellerHtml;
+	});
+	
+	document.getElementById('sellerModal').classList.add('open');
+}
+
+function closeSellersModal() {
+	document.getElementById('sellerModal').classList.remove('open');
+}
+
+function proceedCheckout() {
+	closeSellersModal();
+	
+	const notes = prompt('Pesan khusus untuk seller (opsional):', '');
+	
+	const fd = new FormData();
+	fd.append('action', 'create');
+	if (notes) fd.append('notes', notes);
+	
+	fetch('api/order_create.php', { method: 'POST', body: fd })
+		.then(res => res.text())
+		.then(text => {
+			try {
+				const data = JSON.parse(text);
+				if (data.success) {
+					alert(`✓ Pesanan berhasil dibuat!\n\nNo. Order: ${data.order_id}\nTotal: ${rupiah(data.total)}\n\n${data.message}`);
+					window.location = 'page2.php';
+				} else {
+					alert('Error: ' + (data.error || 'Gagal membuat order'));
+				}
+			} catch (e) {
+				console.error('Parse error:', text);
+				alert('Server error: ' + text.substring(0, 200));
+			}
+		})
+		.catch(err => {
+			alert('Network Error: ' + err.message);
+		});
+}
 </script>
 </body>
 </html>

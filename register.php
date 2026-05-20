@@ -7,8 +7,6 @@ if (isLoggedIn()) { header('Location: index.php'); exit; }
 $error = '';
 $success = '';
 
-// Cek akses atau request masuk 
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $nama     = trim($_POST['nama'] ?? '');
     $email    = trim($_POST['email'] ?? '');

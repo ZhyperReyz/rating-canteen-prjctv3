@@ -5,8 +5,6 @@ requireSeller();
 $seller = currentSeller();
 $sid = $seller['id'];
 
-// Pastikan tabel profil seller tersedia 
-// Pastikan struktur tabel tersedia 
 $conn->query("CREATE TABLE IF NOT EXISTS seller_profiles (
   seller_id INT PRIMARY KEY,
   tanggal_lahir DATE NULL,
@@ -16,21 +14,18 @@ $conn->query("CREATE TABLE IF NOT EXISTS seller_profiles (
   CONSTRAINT fk_seller_profiles_seller FOREIGN KEY (seller_id) REFERENCES sellers(id) ON DELETE CASCADE
 )");
 
-// ── Ambil identitas dasar seller ──
 $sellerIdentityStmt = $conn->prepare("SELECT nama, email FROM sellers WHERE id = ? LIMIT 1");
 $sellerIdentityStmt->bind_param('i', $sid);
 $sellerIdentityStmt->execute();
 $sellerIdentity = $sellerIdentityStmt->get_result()->fetch_assoc();
 $sellerIdentityStmt->close();
 
-// Ambil biodata tambahan seller 
 $sellerProfileStmt = $conn->prepare("SELECT tanggal_lahir, deskripsi, foto_profile FROM seller_profiles WHERE seller_id = ? LIMIT 1");
 $sellerProfileStmt->bind_param('i', $sid);
 $sellerProfileStmt->execute();
 $sellerProfile = $sellerProfileStmt->get_result()->fetch_assoc();
 $sellerProfileStmt->close();
 
-// Siapkan data profil untuk ditampilkan di halaman 
 $seller_name = $sellerIdentity['nama'] ?? ($seller['nama'] ?? 'Seller');
 $seller_email = $sellerIdentity['email'] ?? '';
 $seller_tanggal_lahir = $sellerProfile['tanggal_lahir'] ?? '';
@@ -45,6 +40,46 @@ $stands = [];
 while ($row = $stands_result->fetch_assoc()) $stands[] = $row;
 $stand_ids = array_column($stands, 'id');
 
+// ── Fetch stand ratings dengan replies ──
+$stand_ratings_with_replies = [];
+if ($stand_ids) {
+    $ids_str = implode(',', $stand_ids);
+    $r = $conn->query("
+        SELECT rs.id as rating_id, rs.rating, rs.user_id, u.nama as user_nama, 
+               s.nama as stand_nama, rs.created_at, rr.reply_text, rr.updated_at as reply_date
+        FROM ratings_stand rs
+        JOIN users u ON u.id = rs.user_id
+        JOIN stands s ON s.id = rs.stand_id
+        LEFT JOIN rating_replies rr ON rr.rating_id = rs.id AND rr.rating_type = 'stand'
+        WHERE s.id IN ($ids_str)
+        ORDER BY rs.created_at DESC
+    ");
+    while ($row = $r->fetch_assoc()) {
+        $stand_ratings_with_replies[] = $row;
+    }
+}
+
+// ── Fetch menu ratings dengan replies ──
+$menu_ratings_with_replies = [];
+if ($stand_ids) {
+    $ids_str = implode(',', $stand_ids);
+    $r = $conn->query("
+        SELECT rm.id as rating_id, rm.rating, rm.user_id, u.nama as user_nama, 
+               mi.nama as menu_nama, s.nama as stand_nama, rm.created_at, 
+               rr.reply_text, rr.updated_at as reply_date
+        FROM ratings_menu rm
+        JOIN users u ON u.id = rm.user_id
+        JOIN menu_items mi ON mi.id = rm.menu_id
+        JOIN stands s ON s.id = mi.stand_id
+        LEFT JOIN rating_replies rr ON rr.rating_id = rm.id AND rr.rating_type = 'menu'
+        WHERE s.id IN ($ids_str)
+        ORDER BY rm.created_at DESC
+    ");
+    while ($row = $r->fetch_assoc()) {
+        $menu_ratings_with_replies[] = $row;
+    }
+}
+
 // ── Stats global seller ──
 $total_stands = count($stands);
 $total_menu   = 0;
@@ -54,7 +89,6 @@ $avg_rating   = 0;
 
 if ($stand_ids) {
     $ids_str = implode(',', $stand_ids);
-    // Ambil data dari database
     $r = $conn->query("SELECT COUNT(*) as c, SUM(total_orders) as o FROM menu_items WHERE stand_id IN ($ids_str)");
     $row = $r->fetch_assoc(); $total_menu = $row['c']; $total_orders = $row['o'] ?? 0;
     $r = $conn->query("SELECT COUNT(*) as c FROM reviews r JOIN menu_items m ON m.id = r.menu_id WHERE m.stand_id IN ($ids_str)");
@@ -67,7 +101,6 @@ if ($stand_ids) {
 $recent_reviews = [];
 if ($stand_ids) {
     $ids_str = implode(',', $stand_ids);
-    // Ambil data dari database 
     $r = $conn->query("
         SELECT rv.rating, rv.komentar, rv.created_at, u.nama as user_nama,
                mi.nama as item_nama, s.nama as stand_nama
@@ -81,6 +114,77 @@ if ($stand_ids) {
     while ($row = $r->fetch_assoc()) $recent_reviews[] = $row;
 }
 
+// ── Orders untuk seller ini ──
+$conn->query("CREATE TABLE IF NOT EXISTS orders (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    total_price DECIMAL(10,2) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+$conn->query("CREATE TABLE IF NOT EXISTS order_items (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    order_id INT NOT NULL,
+    menu_id INT NOT NULL,
+    seller_id INT NOT NULL,
+    qty INT NOT NULL,
+    harga DECIMAL(10,2) NOT NULL,
+    subtotal DECIMAL(10,2) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+$sellerColumn = $conn->query("SHOW COLUMNS FROM order_items LIKE 'seller_id'");
+if (!$sellerColumn || $sellerColumn->num_rows === 0) {
+    $conn->query("ALTER TABLE order_items ADD COLUMN seller_id INT NULL AFTER menu_id");
+    $conn->query("ALTER TABLE order_items ADD KEY idx_seller (seller_id)");
+}
+$qtyColumn = $conn->query("SHOW COLUMNS FROM order_items LIKE 'qty'");
+if (!$qtyColumn || $qtyColumn->num_rows === 0) {
+    $conn->query("ALTER TABLE order_items ADD COLUMN qty INT NULL AFTER seller_id");
+    $conn->query("UPDATE order_items SET qty = quantity WHERE qty IS NULL");
+}
+$hargaColumn = $conn->query("SHOW COLUMNS FROM order_items LIKE 'harga'");
+if (!$hargaColumn || $hargaColumn->num_rows === 0) {
+    $conn->query("ALTER TABLE order_items ADD COLUMN harga DECIMAL(10,2) NULL AFTER qty");
+    $conn->query("UPDATE order_items SET harga = price WHERE harga IS NULL");
+}
+$legacyPriceColumn = $conn->query("SHOW COLUMNS FROM order_items LIKE 'price'");
+if ($legacyPriceColumn && $legacyPriceColumn->num_rows > 0) {
+    $conn->query("ALTER TABLE order_items MODIFY price DECIMAL(10,2) NULL");
+}
+$conn->query("
+    UPDATE order_items oi
+    JOIN menu_items m ON m.id = oi.menu_id
+    JOIN stands s ON s.id = m.stand_id
+    SET oi.seller_id = s.seller_id
+    WHERE oi.seller_id IS NULL OR oi.seller_id <> s.seller_id
+");
+
+$seller_orders = [];
+if ($stand_ids) {
+    $ids_str = implode(',', $stand_ids);
+    $r = $conn->query("
+        SELECT DISTINCT o.id, o.user_id, o.total_price, o.status, o.created_at, 
+               u.nama as user_nama, COUNT(oi.id) as item_count
+        FROM orders o
+        JOIN order_items oi ON o.id = oi.order_id
+        JOIN menu_items mi ON mi.id = oi.menu_id
+        JOIN stands s ON s.id = mi.stand_id
+        JOIN users u ON o.user_id = u.id
+        WHERE s.seller_id = $sid
+        GROUP BY o.id
+        ORDER BY o.created_at DESC
+        LIMIT 20
+    ");
+    while ($row = $r->fetch_assoc()) {
+        $seller_orders[] = $row;
+    }
+}
+
 // ── Menu items per stand ──
 $menu_by_stand = [];
 if ($stand_ids) {
@@ -91,8 +195,8 @@ if ($stand_ids) {
 
 $conn->close();
 
-$kategori_opts = ['berat'=>'Makanan Berat','ringan'=>'Makanan Ringan','minuman'=>'Minuman','dessert'=>'Dessert'];
-$icon_map = ['berat'=>'B','ringan'=>'R','minuman'=>'M','dessert'=>'D'];
+$kategori_opts = ['berat'=>'Makanan Berat','ringan'=>'Jajanan Ringan','minuman'=>'Minuman'];
+$emoji_map = ['berat'=>'🍛','ringan'=>'🧆','minuman'=>'🧋','dessert'=>'🧆'];
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -184,7 +288,7 @@ body{background:#0a0a0a;color:#e5e7eb;min-height:100vh;display:flex;}
 .menu-table td{padding:12px 14px;border-bottom:1px solid #1f2937;font-size:13px;color:#d1d5db;vertical-align:middle;}
 .menu-table tr:last-child td{border-bottom:none;}
 .menu-table tr:hover td{background:#0f172a;}
-.item-emoji{width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;border-radius:999px;background:#0f172a;border:1px solid #1f2937;color:#86a84a;font-size:10px;font-weight:800;letter-spacing:0.08em;margin-right:8px;flex-shrink:0;}
+.item-emoji{font-size:20px;margin-right:8px;}
 .item-name-cell{font-weight:600;font-size:13px;color:#f9fafb;}
 .price-cell{font-weight:700;color:#f9fafb;}
 .rating-cell{font-size:12px;}
@@ -241,69 +345,6 @@ body{background:#0a0a0a;color:#e5e7eb;min-height:100vh;display:flex;}
 /* ── RESPONSIVE ── */
 @media(max-width:900px){.stats-grid{grid-template-columns:repeat(2,1fr)}.stand-grid{grid-template-columns:1fr}}
 @media(max-width:640px){.sidebar{display:none}.main{margin-left:0}.content{padding:16px}.setting-grid{grid-template-columns:1fr}}
-
-/* ── LIGHT THEME ── */
-body.light-theme{background:#ffffff;color:#1f2329;}
-body.light-theme .sidebar{background:#f8fafc;border-right-color:#d7dde5;}
-body.light-theme .sidebar-logo .brand{color:#0f172a;}
-body.light-theme .sidebar-logo .sub{color:#4b601d;}
-body.light-theme .seller-name{color:#0f172a;}
-body.light-theme .seller-role{color:#4b601d;}
-body.light-theme .nav-item{color:#475569;}
-body.light-theme .nav-item:hover,body.light-theme .nav-item.active{color:#0f172a;background:#eef2f6;}
-body.light-theme .nav-item.active{border-left-color:#4b601d;}
-body.light-theme .topbar{background:#f8fafc;border-bottom-color:#d7dde5;}
-body.light-theme .page-title{color:#0f172a;}
-body.light-theme .topbar-right a{color:#4b601d;}
-body.light-theme .stat-card{background:#ffffff;border-color:#d7dde5;}
-body.light-theme .stat-card:hover{border-color:#4b601d;}
-body.light-theme .stat-label,body.light-theme .stat-sub{color:#475569;}
-body.light-theme .stat-value{color:#0f172a;}
-body.light-theme .stand-grid,body.light-theme .stand-card{background:#ffffff;border-color:#d7dde5;}
-body.light-theme .stand-card-top{border-bottom-color:#d7dde5;}
-body.light-theme .stand-name{color:#0f172a;}
-body.light-theme .stand-cat{background:#f1f5f9;color:#0f172a;border-color:#d7dde5;}
-body.light-theme .stand-stats{color:#0f172a;}
-body.light-theme .ss-val{color:#0f172a;}
-body.light-theme .ss-lbl{color:#475569;}
-body.light-theme .smenu-header{background:#ffffff;border-color:#d7dde5;}
-body.light-theme .smenu-title{color:#0f172a;}
-body.light-theme .smenu-toggle{color:#475569;}
-body.light-theme .menu-table{background:#ffffff;border-color:#d7dde5;}
-body.light-theme .menu-table th,body.light-theme .menu-table td{border-color:#d7dde5;}
-body.light-theme .menu-table th{color:#475569;}
-body.light-theme .menu-table td{color:#1f2329;}
-body.light-theme .menu-table tr:hover td{background:#f8fafc;}
-body.light-theme .item-emoji{background:#f1f5f9;border-color:#d7dde5;color:#4b601d;}
-body.light-theme .item-name-cell{color:#0f172a;}
-body.light-theme .review-card{background:#ffffff;border-color:#d7dde5;}
-body.light-theme .rc-user{color:#0f172a;}
-body.light-theme .rc-date{color:#475569;}
-body.light-theme .rc-item{color:#64748b;}
-body.light-theme .rc-comment{color:#475569;}
-body.light-theme .setting-wrap{background:#ffffff;border-color:#d7dde5;}
-body.light-theme .setting-desc{color:#475569;}
-body.light-theme .setting-field label{color:#0f172a;}
-body.light-theme .setting-field input,body.light-theme .setting-field textarea{background:#ffffff;color:#0f172a;border-color:#d7dde5;}
-body.light-theme .setting-field input:focus,body.light-theme .setting-field textarea:focus{border-color:#4b601d;box-shadow:0 0 0 3px rgba(75,96,29,0.15);}
-body.light-theme .setting-field input[readonly]{background:#f1f5f9;color:#64748b;}
-body.light-theme .setting-help{color:#475569;}
-body.light-theme .profile-preview{border-color:#d7dde5;background:#f1f5f9;}
-body.light-theme .btn-logout{background:#f8fafc;color:#1f2937;border-color:#d7dde5;}
-body.light-theme .btn-logout:hover{background:#eef2f6;color:#0f172a;}
-body.light-theme .modal-form{background:#ffffff;border-color:#d7dde5;}
-body.light-theme .mf-title{color:#0f172a;}
-body.light-theme .form-field label{color:#0f172a;}
-body.light-theme .form-field input,body.light-theme .form-field select,body.light-theme .form-field textarea{background:#ffffff;color:#0f172a;border-color:#d7dde5;}
-body.light-theme .form-field input:focus,body.light-theme .form-field select:focus,body.light-theme .form-field textarea:focus{border-color:#4b601d;box-shadow:0 0 0 3px rgba(75,96,29,0.15);}
-body.light-theme .form-field select option{background:#ffffff;color:#0f172a;}
-body.light-theme .btn-cancel{color:#0f172a;border-color:#d7dde5;}
-body.light-theme .btn-cancel:hover{color:#0f172a;border-color:#4b601d;}
-body.light-theme .section-title{color:#0f172a;}
-body.light-theme .empty-dash p{color:#0f172a;}
-body.light-theme .theme-wrap{border-color:#d7dde5;}
-body.light-theme .theme-title{color:#0f172a;}
-body.light-theme .theme-option{color:#0f172a;}
 </style>
 </head>
 <body>
@@ -311,7 +352,7 @@ body.light-theme .theme-option{color:#0f172a;}
 <!-- SIDEBAR -->
 <div class="sidebar">
   <div class="sidebar-logo">
-    <div class="brand">SMKN 1 SURABAYA</div>
+    <div class="brand">🍽️ Cafeteria</div>
     <div class="sub">Seller Dashboard</div>
   </div>
   <div class="sidebar-seller">
@@ -319,7 +360,7 @@ body.light-theme .theme-option{color:#0f172a;}
       <?php if (!empty($seller_foto_profile)): ?>
         <img src="<?= htmlspecialchars($seller_foto_profile) ?>" alt="Foto Profil Seller">
       <?php else: ?>
-        S
+        👤
       <?php endif; ?>
     </div>
     <div class="seller-name"><?= htmlspecialchars($seller_name) ?></div>
@@ -327,19 +368,25 @@ body.light-theme .theme-option{color:#0f172a;}
   </div>
   <nav class="sidebar-nav">
     <a class="nav-item active" data-section="overview" onclick="showSection('overview')">
-      <span class="nav-icon"></span> Overview
+      <span class="nav-icon">📊</span> Overview
     </a>
     <a class="nav-item" data-section="stands" onclick="showSection('stands')">
-      <span class="nav-icon"></span> My Stands
+      <span class="nav-icon">🏪</span> My Stands
     </a>
     <a class="nav-item" data-section="menu" onclick="showSection('menu')">
-      <span class="nav-icon"></span> Menu Items
+      <span class="nav-icon">🍽️</span> Menu Items
     </a>
     <a class="nav-item" data-section="reviews" onclick="showSection('reviews')">
-      <span class="nav-icon"></span> Reviews
+      <span class="nav-icon">⭐</span> Reviews
+    </a>
+    <a class="nav-item" data-section="orders" onclick="showSection('orders')">
+      <span class="nav-icon">🛒</span> Pesanan
+    </a>
+    <a class="nav-item" data-section="ratings" onclick="showSection('ratings')">
+      <span class="nav-icon">💬</span> Ratings & Replies
     </a>
     <a class="nav-item" data-section="setting" onclick="showSection('setting')">
-      <span class="nav-icon"></span> Setting
+      <span class="nav-icon">⚙️</span> Setting
     </a>
   </nav>
   <div class="sidebar-footer">
@@ -362,25 +409,25 @@ body.light-theme .theme-option{color:#0f172a;}
     <div class="section active" id="section-overview">
       <div class="stats-grid">
         <div class="stat-card">
-          <div class="stat-icon"></div>
+          <div class="stat-icon">🏪</div>
           <div class="stat-label">Total Stand</div>
           <div class="stat-value"><?= $total_stands ?></div>
           <div class="stat-sub">stand aktif</div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon"></div>
+          <div class="stat-icon">🍽️</div>
           <div class="stat-label">Menu Items</div>
           <div class="stat-value"><?= $total_menu ?></div>
           <div class="stat-sub">item di semua stand</div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon"></div>
+          <div class="stat-icon">⭐</div>
           <div class="stat-label">Avg Rating</div>
           <div class="stat-value"><?= $avg_rating ?: '—' ?></div>
           <div class="stat-sub">rata-rata semua stand</div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon"></div>
+          <div class="stat-icon">💬</div>
           <div class="stat-label">Total Reviews</div>
           <div class="stat-value"><?= $total_reviews ?></div>
           <div class="stat-sub">dari semua item</div>
@@ -392,7 +439,7 @@ body.light-theme .theme-option{color:#0f172a;}
         <div class="section-title">Reviews Terbaru</div>
       </div>
       <?php if (empty($recent_reviews)): ?>
-        <div class="empty-dash"><div class="ei"></div><p>Belum ada reviews</p></div>
+        <div class="empty-dash"><div class="ei">💬</div><p>Belum ada reviews</p></div>
       <?php else: ?>
         <?php foreach ($recent_reviews as $rv): ?>
         <div class="review-card">
@@ -417,7 +464,7 @@ body.light-theme .theme-option{color:#0f172a;}
         <button class="btn-primary" onclick="openAddStand()">+ Tambah Stand</button>
       </div>
       <?php if (empty($stands)): ?>
-        <div class="empty-dash"><div class="ei"></div><p>Belum ada stand. Tambah sekarang!</p></div>
+        <div class="empty-dash"><div class="ei">🏪</div><p>Belum ada stand. Tambah sekarang!</p></div>
       <?php else: ?>
       <div class="stand-grid">
         <?php foreach ($stands as $stand): ?>
@@ -425,7 +472,7 @@ body.light-theme .theme-option{color:#0f172a;}
           <div class="stand-card-top">
             <div class="stand-info">
               <div class="stand-name"><?= htmlspecialchars($stand['nama']) ?></div>
-              <span class="stand-cat"><?= $kategori_opts[$stand['kategori']] ?? $stand['kategori'] ?></span>
+              <span class="stand-cat"><?= $kategori_opts[$stand['kategori']] ?? ($stand['kategori'] === 'dessert' ? 'Jajanan Ringan' : $stand['kategori']) ?></span>
               <div class="stand-rating">
                 <?php for ($s=1;$s<=5;$s++): ?>
                 <span style="color:<?= $s<=round($stand['rating'])?'#fff':'#333' ?>">★</span>
@@ -467,12 +514,12 @@ body.light-theme .theme-option{color:#0f172a;}
         <button class="btn-primary" onclick="openAddMenu()">+ Tambah Item</button>
       </div>
       <?php if (empty($stands)): ?>
-        <div class="empty-dash"><div class="ei"></div><p>Buat stand dulu sebelum tambah menu</p></div>
+        <div class="empty-dash"><div class="ei">🍽️</div><p>Buat stand dulu sebelum tambah menu</p></div>
       <?php else: ?>
         <?php foreach ($stands as $stand): ?>
         <div class="stand-menu-section">
           <div class="smenu-header" onclick="toggleMenuTable(<?= $stand['id'] ?>)">
-            <div class="smenu-title"><?= $icon_map[$stand['kategori']] ?? '' ?> <?= htmlspecialchars($stand['nama']) ?></div>
+            <div class="smenu-title"><?= $emoji_map[$stand['kategori']] ?? '🍽️' ?> <?= htmlspecialchars($stand['nama']) ?></div>
             <div class="smenu-toggle" id="toggle-<?= $stand['id'] ?>">▲ tutup</div>
           </div>
           <div id="menu-table-<?= $stand['id'] ?>">
@@ -487,7 +534,7 @@ body.light-theme .theme-option{color:#0f172a;}
             <tbody>
               <?php foreach ($items as $item): ?>
               <tr>
-                <td><span class="item-emoji"><?= $icon_map[$stand['kategori']] ?? '' ?></span><span class="item-name-cell"><?= htmlspecialchars($item['nama']) ?></span></td>
+                <td><span class="item-emoji"><?= $emoji_map[$stand['kategori']] ?? '🍽️' ?></span><span class="item-name-cell"><?= htmlspecialchars($item['nama']) ?></span></td>
                 <td class="price-cell">Rp <?= number_format($item['harga'],0,',','.') ?></td>
                 <td class="rating-cell"><?= str_repeat('★', round($item['rating'])) ?><span style="color:#333"><?= str_repeat('★', 5-round($item['rating'])) ?></span> <span style="color:#444;font-size:11px;">(<?= $item['rating'] ?>)</span></td>
                 <td style="color:#444;font-family:'Oxanium',sans-serif;font-size:12px;"><?= $item['total_votes'] ?></td>
@@ -514,7 +561,7 @@ body.light-theme .theme-option{color:#0f172a;}
       </div>
       <div id="reviewsContainer">
         <?php if (empty($stand_ids)): ?>
-          <div class="empty-dash"><div class="ei"></div><p>Belum ada reviews</p></div>
+          <div class="empty-dash"><div class="ei">⭐</div><p>Belum ada reviews</p></div>
         <?php else: ?>
           <?php
           // require_once 'config.php';
@@ -531,7 +578,7 @@ body.light-theme .theme-option{color:#0f172a;}
           // $conn->close();
           ?>
           <?php if (empty($all_reviews)): ?>
-            <div class="empty-dash"><div class="ei"></div><p>Belum ada reviews</p></div>
+            <div class="empty-dash"><div class="ei">💬</div><p>Belum ada reviews</p></div>
           <?php else: ?>
             <?php foreach ($all_reviews as $rv): ?>
             <div class="review-card">
@@ -549,6 +596,111 @@ body.light-theme .theme-option{color:#0f172a;}
           <?php endif; ?>
         <?php endif; ?>
       </div>
+    </div>
+
+    <!-- ══ ORDERS ══ -->
+    <div class="section" id="section-orders">
+      <div class="section-header">
+        <div class="section-title">Pesanan Pelanggan</div>
+      </div>
+      
+      <?php if (empty($seller_orders)): ?>
+        <div class="empty-dash"><div class="ei">🛒</div><p>Belum ada pesanan</p></div>
+      <?php else: ?>
+        <div id="ordersContainer" style="display:grid;gap:14px;">
+          <?php foreach ($seller_orders as $order): 
+            $statusColor = [
+              'pending' => '#f59e0b',
+              'confirmed' => '#3b82f6',
+              'completed' => '#10b981',
+              'cancelled' => '#ef4444'
+            ][$order['status']] ?? '#6b7280';
+            $statusText = [
+              'pending' => 'Menunggu Konfirmasi',
+              'confirmed' => 'Dikonfirmasi',
+              'completed' => 'Selesai',
+              'cancelled' => 'Dibatalkan'
+            ][$order['status']] ?? $order['status'];
+          ?>
+          <div class="review-card" style="border-left:4px solid <?= $statusColor ?>;">
+            <div class="rc-top">
+              <div>
+                <div class="rc-user"><?= htmlspecialchars($order['user_nama']) ?></div>
+                <div class="rc-item">Order #<?= $order['id'] ?> · <?= $order['item_count'] ?> item</div>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <span style="background:<?= $statusColor ?>;color:#fff;padding:4px 12px;border-radius:4px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;"><?= $statusText ?></span>
+                <div class="rc-date"><?= date('d M Y', strtotime($order['created_at'])) ?></div>
+              </div>
+            </div>
+            <div style="margin-top:12px;padding-top:12px;border-top:1px solid #ebebeb;">
+              <div style="font-size:13px;color:#666;margin-bottom:8px;">Total: <strong style="color:#2b2b2b;">Rp<?= number_format($order['total_price'], 0, ',', '.') ?></strong></div>
+              <button class="btn-primary btn-sm" onclick="openOrderDetailModal(<?= $order['id'] ?>)">📋 Lihat Detail</button>
+              <?php if ($order['status'] === 'pending'): ?>
+                <button class="btn-primary btn-sm" onclick="updateOrderStatus(<?= $order['id'] ?>, 'confirmed')" style="background:#10b981;">✓ Konfirmasi</button>
+              <?php elseif ($order['status'] === 'confirmed'): ?>
+                <button class="btn-primary btn-sm" onclick="updateOrderStatus(<?= $order['id'] ?>, 'completed')" style="background:#059669;">✓ Selesai</button>
+              <?php endif; ?>
+            </div>
+          </div>
+          <?php endforeach; ?>
+        </div>
+      <?php endif; ?>
+    </div>
+
+    <!-- ══ RATINGS & REPLIES ══ -->
+    <div class="section" id="section-ratings">
+      <div class="section-header">
+        <div class="section-title">Ratings & Balasan Seller</div>
+        <span style="font-family:'Oxanium',sans-serif;font-size:11px;color:#444;margin-left:auto;">Balas rating dari pelanggan untuk meningkatkan kepercayaan</span>
+      </div>
+      
+      <?php if (empty(array_merge($stand_ratings_with_replies, $menu_ratings_with_replies))): ?>
+        <div class="empty-dash"><div class="ei">💬</div><p>Belum ada rating untuk dibalas</p></div>
+      <?php else: ?>
+        <div id="ratingsContainer" style="display:grid;gap:14px;">
+          <?php 
+          // Combine and sort by date
+          $allRatings = array_merge($stand_ratings_with_replies, $menu_ratings_with_replies);
+          usort($allRatings, function($a, $b) { return strtotime($b['created_at']) - strtotime($a['created_at']); });
+          
+          foreach ($allRatings as $rating): 
+            $isForStand = isset($rating['stand_nama']) && !isset($rating['menu_nama']);
+            $ratingType = isset($rating['menu_nama']) ? 'menu' : 'stand';
+          ?>
+          <div class="review-card" style="position:relative;">
+            <div class="rc-top">
+              <div>
+                <div class="rc-user"><?= htmlspecialchars($rating['user_nama']) ?></div>
+                <div class="rc-item">
+                  <?php if ($ratingType === 'menu'): ?>
+                    <?= htmlspecialchars($rating['menu_nama']) ?> · <?= htmlspecialchars($rating['stand_nama']) ?>
+                  <?php else: ?>
+                    Stand: <?= htmlspecialchars($rating['stand_nama']) ?>
+                  <?php endif; ?>
+                </div>
+              </div>
+              <div class="rc-date"><?= date('d M Y', strtotime($rating['created_at'])) ?></div>
+            </div>
+            <div class="rc-stars"><?= str_repeat('★', $rating['rating']) ?><span style="color:#444"><?= str_repeat('★', 5 - $rating['rating']) ?></span></div>
+            
+            <!-- Seller Reply Display -->
+            <?php if (!empty($rating['reply_text'])): ?>
+              <div style="background:#0f172a;border-left:3px solid #6f8a34;padding:12px;margin-top:12px;margin-bottom:12px;">
+                <div style="font-size:10px;color:#86a84a;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;">Balasan Seller</div>
+                <div style="font-size:13px;color:#e5e7eb;line-height:1.5;"><?= htmlspecialchars($rating['reply_text']) ?></div>
+                <div style="font-size:10px;color:#64748b;margin-top:6px;">Diperbarui: <?= date('d M Y H:i', strtotime($rating['reply_date'])) ?></div>
+              </div>
+            <?php endif; ?>
+            
+            <!-- Reply Form -->
+            <button class="btn-primary btn-sm" onclick="openReplyModal(<?= $rating['rating_id'] ?>, '<?= $ratingType ?>', '<?= addslashes($rating['user_nama']) ?>', '<?= addslashes($ratingType === 'menu' ? $rating['menu_nama'] : $rating['stand_nama']) ?>')" style="margin-top:8px;">
+              <?= !empty($rating['reply_text']) ? '✏️ Edit Balasan' : '💬 Balas' ?>
+            </button>
+          </div>
+          <?php endforeach; ?>
+        </div>
+      <?php endif; ?>
     </div>
 
     <!-- ══ SETTING ══ -->
@@ -592,21 +744,6 @@ body.light-theme .theme-option{color:#0f172a;}
 
           <button type="submit" class="btn-save">Simpan Biodata</button>
         </form>
-
-        <div class="theme-wrap" style="margin-top:28px;padding-top:28px;border-top:1px solid #1f2937;">
-          <div class="theme-title" style="font-weight:700;font-size:13px;color:#f9fafb;margin-bottom:14px;letter-spacing:0.05em;">Mode Tampilan</div>
-          <div class="theme-options" id="themeOptions" style="display:flex;gap:16px;">
-            <label class="theme-option" for="themeDark" style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-              <input type="radio" id="themeDark" name="theme_mode" value="dark" checked style="cursor:pointer;">
-              <span style="font-size:12px;color:#d1d5db;">Mode Gelap</span>
-            </label>
-            <label class="theme-option" for="themeLight" style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-              <input type="radio" id="themeLight" name="theme_mode" value="light" style="cursor:pointer;">
-              <span style="font-size:12px;color:#d1d5db;">Mode Terang</span>
-            </label>
-          </div>
-          <div class="setting-help" style="margin-top:8px;">Pilih Mode Terang untuk mengubah tema dashboard menjadi terang.</div>
-        </div>
       </div>
     </div>
 
@@ -664,6 +801,30 @@ body.light-theme .theme-option{color:#0f172a;}
   </div>
 </div>
 
+<!-- ══ MODAL: REPLY TO RATING ══ -->
+<div class="modal-bg" id="modalReply">
+  <div class="modal-form">
+    <div class="mf-title">Balas Rating Pelanggan</div>
+    <input type="hidden" id="replyRatingId" value=""/>
+    <input type="hidden" id="replyRatingType" value=""/>
+    <div style="background:#0f172a;padding:12px;border-left:3px solid #6f8a34;margin-bottom:16px;">
+      <div style="font-size:10px;color:#86a84a;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;">Rating dari</div>
+      <div id="replyFromUser" style="font-size:13px;color:#f9fafb;"></div>
+      <div id="replyForItem" style="font-size:11px;color:#9ca3af;margin-top:4px;"></div>
+    </div>
+    <div class="form-field">
+      <label>Balasan Seller</label>
+      <textarea id="replyText" placeholder="Terima kasih atas review Anda, kami senang melayani Anda..." style="width:100%;padding:10px 14px;border:1.5px solid #1f2937;font-size:13px;color:#f9fafb;background:#0f172a;outline:none;min-height:120px;resize:vertical;"></textarea>
+      <div style="font-size:10px;color:#64748b;margin-top:6px;">Maksimum 500 karakter</div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-primary" onclick="saveReply()">Kirim Balasan</button>
+      <button class="btn-cancel" onclick="closeModal('modalReply')">Batal</button>
+    </div>
+    <div class="form-msg" id="replyMsg" style="display:none"></div>
+  </div>
+</div>
+
 <script>
 // ── SECTION NAVIGATION ──
 function showSection(name) {
@@ -671,7 +832,7 @@ function showSection(name) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('section-' + name).classList.add('active');
   document.querySelector(`[data-section="${name}"]`).classList.add('active');
-  const titles = { overview:'Overview', stands:'My Stands', menu:'Menu Items', reviews:'Reviews', setting:'Setting Biodata' };
+  const titles = { overview:'Overview', stands:'My Stands', menu:'Menu Items', reviews:'Reviews', orders:'Pesanan', ratings:'Ratings & Replies', setting:'Setting Biodata' };
   document.getElementById('topbarTitle').textContent = titles[name] || name;
 }
 
@@ -819,6 +980,52 @@ function deleteMenu(id) {
     .then(r=>r.json()).then(data => { if (data.success) location.reload(); else alert(data.error); });
 }
 
+// ── RATING REPLIES ──
+function openReplyModal(ratingId, ratingType, userName, itemName) {
+  document.getElementById('replyRatingId').value = ratingId;
+  document.getElementById('replyRatingType').value = ratingType;
+  document.getElementById('replyFromUser').textContent = userName;
+  document.getElementById('replyForItem').textContent = itemName;
+  document.getElementById('replyText').value = '';
+  document.getElementById('replyMsg').style.display = 'none';
+  openModal('modalReply');
+}
+
+function saveReply() {
+  const ratingId = document.getElementById('replyRatingId').value;
+  const ratingType = document.getElementById('replyRatingType').value;
+  const replyText = document.getElementById('replyText').value.trim();
+  const msgEl = document.getElementById('replyMsg');
+  
+  if (!ratingId || !ratingType || !replyText) {
+    showMsg(msgEl, 'Balasan tidak boleh kosong!', 'err');
+    return;
+  }
+  
+  if (replyText.length > 500) {
+    showMsg(msgEl, 'Balasan maksimal 500 karakter!', 'err');
+    return;
+  }
+  
+  const fd = new FormData();
+  fd.append('action', 'reply');
+  fd.append('rating_id', ratingId);
+  fd.append('rating_type', ratingType);
+  fd.append('reply_text', replyText);
+  
+  fetch('api/rate.php', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) {
+        showMsg(msgEl, data.error, 'err');
+        return;
+      }
+      showMsg(msgEl, data.message, 'ok');
+      setTimeout(() => { closeModal('modalReply'); location.reload(); }, 800);
+    })
+    .catch(() => showMsg(msgEl, 'Gagal mengirim balasan.', 'err'));
+}
+
 // ── SELLER SETTINGS ──
 const sellerSettingForm = document.getElementById('sellerSettingForm');
 const sellerProfileInput = document.getElementById('sellerFotoProfile');
@@ -887,40 +1094,51 @@ function showMsg(el, msg, type) {
   el.textContent = msg; el.className = 'form-msg ' + type; el.style.display = 'block';
 }
 
+// ── ORDER MANAGEMENT ──
+function openOrderDetailModal(orderId) {
+  fetch(`api/order_status.php?action=detail&order_id=${orderId}`)
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) { alert(data.error); return; }
+      let itemsHtml = '';
+      data.items.forEach(item => {
+        itemsHtml += `
+          <div style="padding:10px;background:#f8f8f8;border-radius:4px;margin:8px 0;">
+            <div style="font-weight:700;color:#2b2b2b;">${item.menu_nama}</div>
+            <div style="font-size:12px;color:#666;margin-top:4px;">
+              ${item.qty} × Rp${Number(item.harga).toLocaleString('id-ID')} = Rp${Number(item.subtotal).toLocaleString('id-ID')}
+            </div>
+          </div>
+        `;
+      });
+      const order = data.order;
+      alert(`Order #${order.id}\n\nPelanggan: ${order.user_nama}\nStatus: ${order.status.toUpperCase()}\nTotal: Rp${Number(order.total_price).toLocaleString('id-ID')}\nTanggal: ${new Date(order.created_at).toLocaleDateString('id-ID')}\n\nItems:\n${data.items.map(i => `- ${i.menu_nama} (${i.qty}x)`).join('\n')}`);
+    })
+    .catch(err => alert('Error: ' + err.message));
+}
+
+function updateOrderStatus(orderId, newStatus) {
+  if (!confirm(`Ubah status order jadi "${newStatus}"?`)) return;
+  
+  const fd = new FormData();
+  fd.append('action', 'update');
+  fd.append('order_id', orderId);
+  fd.append('status', newStatus);
+  
+  fetch('api/order_status.php', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) { alert('Error: ' + data.error); return; }
+      alert(data.message);
+      location.reload();
+    })
+    .catch(err => alert('Error: ' + err.message));
+}
+
 // Close modal on overlay click
 document.querySelectorAll('.modal-bg').forEach(bg => {
   bg.addEventListener('click', e => { if (e.target === bg) bg.classList.remove('open'); });
 });
-
-// ── THEME ──
-const THEME_KEY = 'seller_dashboard_theme_<?= $sid ?>';
-
-function applyTheme(mode) {
-  if (mode === 'light') {
-    document.body.classList.add('light-theme');
-  } else {
-    document.body.classList.remove('light-theme');
-  }
-
-  const darkRadio = document.getElementById('themeDark');
-  const lightRadio = document.getElementById('themeLight');
-  if (darkRadio && lightRadio) {
-    darkRadio.checked = mode !== 'light';
-    lightRadio.checked = mode === 'light';
-  }
-}
-
-const savedTheme = localStorage.getItem(THEME_KEY) || 'dark';
-applyTheme(savedTheme);
-
-const themeOptionsWrap = document.getElementById('themeOptions');
-if (themeOptionsWrap) {
-  themeOptionsWrap.addEventListener('change', (e) => {
-    const selected = e.target && e.target.value === 'light' ? 'light' : 'dark';
-    localStorage.setItem(THEME_KEY, selected);
-    applyTheme(selected);
-  });
-}
 </script>
 </body>
 </html>

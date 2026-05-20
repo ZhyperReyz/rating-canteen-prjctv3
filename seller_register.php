@@ -5,7 +5,6 @@ require_once 'config.php';
 if (isSellerLoggedIn()) { header('Location: dashboard.php'); exit; }
 
 $error = ''; $success = '';
-// Cek akses atau request masuk 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $nama    = trim($_POST['nama'] ?? '');
     $email   = trim($_POST['email'] ?? '');
@@ -16,7 +15,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     elseif (strlen($pass) < 6) { $error = 'Password minimal 6 karakter.'; }
     elseif ($pass !== $confirm) { $error = 'Konfirmasi password tidak cocok.'; }
     else {
-      // Siapkan query database 
         $stmt = $conn->prepare("SELECT id FROM sellers WHERE email = ?");
         $stmt->bind_param('s', $email); $stmt->execute();
         $existing = $stmt->get_result()->fetch_assoc(); $stmt->close();
@@ -42,10 +40,9 @@ $conn->close();
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:'Nunito',sans-serif;background:#0a0a0a;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
 .box{background:#111;border:1px solid #222;width:100%;max-width:400px;padding:40px;}
-.logo{font-family:'Oxanium',sans-serif;font-weight:800;font-size:1.1rem;color:#fff;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:32px;display:flex;align-items:center;gap:10px;text-decoration:none;}
-.logo-icon{width:36px;height:36px;border-radius:10px;background:transparent;box-shadow:0 10px 24px rgba(55,32,20,0.25);display:flex;align-items:center;justify-content:center;font-size:16px;overflow:hidden;}
-.logo-icon img{width:100%;height:100%;object-fit:contain;display:block;background:transparent;}
-.logo .sub{color:#9fbeaa;font-size:11px;display:block;font-weight:400;}
+.logo{font-family:'Oxanium',sans-serif;font-weight:800;font-size:1.1rem;color:#fff;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:32px;display:flex;align-items:center;gap:10px;}
+.logo-icon{width:36px;height:36px;background:#fff;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:16px;}
+.logo .sub{color:#666;font-size:11px;display:block;font-weight:400;}
 h1{font-family:'Oxanium',sans-serif;font-weight:800;font-size:1.5rem;color:#fff;margin-bottom:6px;}
 .sub-text{font-size:13px;color:#555;margin-bottom:28px;}
 .field{margin-bottom:16px;}
@@ -64,14 +61,14 @@ h1{font-family:'Oxanium',sans-serif;font-weight:800;font-size:1.5rem;color:#fff;
 </head>
 <body>
 <div class="box">
-  <div class="logo"><div class="logo-icon"><img src="assets/img/logosmkn-transparent.png" alt="SMKN 1 Surabaya"></div><div><span>SMKN 1 SURABAYA</span><span class="sub">Kantin</span></div></div>
+  <div class="logo"><div class="logo-icon">🍽️</div><div><span>Seller</span><span class="sub">Dashboard</span></div></div>
   <h1>Daftar Seller</h1>
   <p class="sub-text">Buat akun penjual baru</p>
   <?php if ($error): ?><div class="err"><?= htmlspecialchars($error) ?></div><?php endif; ?>
   <?php if ($success): ?><div class="ok"><?= $success ?> <a href="seller_login.php" style="color:#66ff99;">Login →</a></div><?php endif; ?>
   <?php if (!$success): ?>
   <form method="POST">
-    <div class="field"><label>Nama Lengkap</label><input type="text" name="nama" placeholder="Masukkan nama anda" required value="<?= htmlspecialchars($_POST['nama'] ?? '') ?>"/></div>
+    <div class="field"><label>Nama Lengkap</label><input type="text" name="nama" placeholder="Nama lo" required value="<?= htmlspecialchars($_POST['nama'] ?? '') ?>"/></div>
     <div class="field"><label>Email</label><input type="email" name="email" placeholder="email@seller.com" required value="<?= htmlspecialchars($_POST['email'] ?? '') ?>"/></div>
     <div class="field"><label>Password</label><input type="password" name="password" placeholder="Min. 6 karakter" required/></div>
     <div class="field"><label>Konfirmasi Password</label><input type="password" name="confirm" placeholder="Ulangi password" required/></div>

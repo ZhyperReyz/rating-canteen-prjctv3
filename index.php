@@ -4,8 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Intel Kantin</title>
-<?php $css_v = file_exists(__DIR__ . '/assets/css/style.css') ? filemtime(__DIR__ . '/assets/css/style.css') : time(); ?>
-<link rel="stylesheet" href="assets/css/style.css?v=<?=$css_v?>">
+<link rel="stylesheet" href="assets/css/style.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@400;600;700;800&family=Nunito:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -14,10 +13,10 @@
 
 </head>
 <body>
-<!-- -- Navigasi utama halaman landing -- -->
+
 <nav>
   <div class="nav-logo">
-    <div class="logo-icon"><img src = "assets/img/logosmkn-transparent.png" height = "50px"></div>
+    <div class="logo-icon"></div>
     <div>
       <div>Intel</div>
       <div class="sub">Kantin</div>
@@ -34,7 +33,6 @@
   </button>
 </nav>
 
-<!-- -- Menu mobile halaman landing -- -->
 <div class="mobile-menu" id="mobileMenu">
   <a href="#home">Beranda</a>
   <a href="page2.php">Pesan Sekarang</a>
@@ -42,7 +40,6 @@
   <!-- <a href="#" class="btn-join">Join Us</a> -->
 </div>
 
-<!-- -- Hero utama halaman landing -- -->
 <section class="hero" id="home">
   <div class="stars"></div>
   <div class="glow-ring"></div>
@@ -77,7 +74,6 @@
   </div>
 </section>
 
-<!-- -- Section informasi tentang kantin -- -->
 <section class="intro" id="about">
   <div class="intro-inner">
     <div class="intro-tag">✦ Tentang Kami</div>

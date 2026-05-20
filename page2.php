@@ -73,8 +73,8 @@ $conn->close();
 // Sesuaikan kalau nama file beda
 $fotoMap = [1=>'image1.jpeg',2=>'image2.jpeg',3=>'image3 .jpeg',4=>'image4.jpeg',5=>'image5.jpeg'];
 
-$emojiMap = ['berat'=>'🍛','ringan'=>'🧆','minuman'=>'🧋','dessert'=>'🧇'];
-$labelMap = ['berat'=>'Makanan Berat','ringan'=>'Makanan Ringan','minuman'=>'Minuman','dessert'=>'Dessert'];
+$emojiMap = ['berat'=>'🍛','ringan'=>'🧆','minuman'=>'🧋','dessert'=>'🧆'];
+$labelMap = ['berat'=>'Makanan Berat','ringan'=>'Jajanan Ringan','minuman'=>'Minuman','dessert'=>'Jajanan Ringan'];
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -105,6 +105,8 @@ body {
   overflow-x: hidden;
   color: var(--ink);
 }
+
+/* ===== NAVBAR ===== */
 nav {
   position: fixed;
   top: 0;
@@ -136,7 +138,7 @@ nav {
   width: 36px;
   height: 36px;
   border-radius: 10px;
-  /* background: linear-gradient(160deg, #23310d, #4b601d); */
+  background: linear-gradient(160deg, #23310d, #4b601d);
   box-shadow: 0 10px 24px rgba(55, 32, 20, 0.25);
   display: flex;
   align-items: center;
@@ -294,7 +296,7 @@ nav {
   line-height: 1;
 }
 
-
+/* ===== FILTER BAR ===== */
 .gallery-bar {
   background: #ffffff;
   border-bottom: 1px solid #eadfce;
@@ -453,7 +455,7 @@ nav {
 }
 .gcard-link:hover { color: #372014; border-color: #372014; }
 .empty-state { text-align: center; padding: 80px 0; }
-.empty-icon { width: 48px; height: 48px; margin-bottom: 14px; opacity: 0.35; display: inline-block; }
+.empty-icon { font-size: 48px; margin-bottom: 14px; opacity: 0.35; }
 .empty-text {
   font-family: 'Space Grotesk', sans-serif;
   font-size: 13px;
@@ -466,6 +468,7 @@ nav {
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* ===== MODAL ===== */
 .modal-overlay {
   display: none;
   position: fixed;
@@ -739,18 +742,7 @@ nav {
   .gallery-inner { padding: 0 14px; margin-top: 16px; margin-bottom: 60px; }
   .card-grid { grid-template-columns: 1fr; gap: 12px; }
   .gcard-img { aspect-ratio: 3/2; }
-  .gcard-tag {
-    top: 8px;
-    left: 8px;
-    right: auto;
-    bottom: auto;
-    width: fit-content;
-    max-width: calc(100% - 16px);
-    white-space: nowrap;
-    font-size: 8px;
-    letter-spacing: 0.08em;
-    padding: 4px 8px;
-  }
+  .gcard-tag { bottom: 8px; left: 8px; font-size: 9px; padding: 3px 8px; }
   .gcard-body { padding: 12px 14px 14px; }
   .gcard-title { font-size: 12px; margin-bottom: 8px; }
   .gcard-meta { font-size: 11px; gap: 6px; }
@@ -759,7 +751,7 @@ nav {
   .rating-num { font-size: 10px; margin-left: 2px; }
   .gcard-count { font-size: 10px; }
   .gcard-link { font-size: 10px; }
-  .empty-icon { width: 36px; height: 36px; }
+  .empty-icon { font-size: 36px; }
   .empty-text { font-size: 11px; }
   .modal-overlay { padding: 12px; }
   .modal-box { border: none; border-radius: 8px 8px 0 0; max-height: 88vh; }
@@ -784,10 +776,12 @@ nav {
 </style>
 </head>
 <body>
+
+<!-- NAVBAR -->
 <nav>
   <a href="index.php" class="nav-logo">
-    <div class="logo-icon"><img src = "assets/img/logosmkn-transparent.png" height = "50px"></div>
-    <div><div>SMKN 1 SURABAYA</div><div class="sub">Kantin</div></div>
+    <div class="logo-icon">🍽️</div>
+    <div><div>School</div><div class="sub">Cafeteria</div></div>
   </a>
   <ul class="nav-links">
     <li><a href="index.php">Home</a></li>
@@ -825,6 +819,7 @@ nav {
   <?php endif; ?>
 </div>
 
+<!-- PAGE HEADER -->
 <div class="page-header">
   <div class="page-header-inner">
     <div>
@@ -838,7 +833,7 @@ nav {
   </div>
 </div>
 
-
+<!-- FILTER BAR -->
 <div class="gallery-bar">
   <div class="gallery-bar-inner">
     <div class="search-wrap">
@@ -848,14 +843,13 @@ nav {
     <div class="filter-tabs">
       <button class="ftab active" data-cat="all">Semua</button>
       <button class="ftab" data-cat="berat">Makanan Berat</button>
-      <button class="ftab" data-cat="ringan">Makanan Ringan</button>
+      <button class="ftab" data-cat="ringan">Jajanan Ringan</button>
       <button class="ftab" data-cat="minuman">Minuman</button>
-      <button class="ftab" data-cat="dessert">Dessert</button>
     </div>
   </div>
 </div>
 
-
+<!-- CARD GRID (dari DB) -->
 <div class="gallery-inner">
   <div class="card-grid" id="cardGrid">
     <?php if (empty($stands)): ?>
@@ -878,7 +872,7 @@ nav {
           <?php if ($foto): ?>
             <img src="<?= htmlspecialchars($foto) ?>" alt="<?= htmlspecialchars($stand['nama']) ?>" class="gcard-photo"/>
           <?php endif; ?>
-          <div class="gcard-placeholder"></div>
+          <div class="gcard-placeholder"><?= $emoji ?></div>
           <span class="gcard-tag"><?= $label ?></span>
         </div>
         <div class="gcard-body">
@@ -906,7 +900,7 @@ nav {
   </div>
 
   <div class="empty-state" id="emptyState" style="display:none;">
-    <img class="empty-icon" src="https://api.iconify.design/mdi:magnify.svg?color=%23c8a7d6" alt="" aria-hidden="true">
+    <div class="empty-icon">🔍</div>
     <div class="empty-text">Tidak ada hasil ditemukan</div>
   </div>
 </div>
@@ -1049,6 +1043,10 @@ nav {
 .ri-stars { font-size: 13px; color: #c67b35; margin-bottom: 6px; }
 .ri-stars span { color: #dfcfbe; }
 .ri-komentar { font-size: 13px; color: #62584f; line-height: 1.5; }
+.seller-reply { margin-top: 12px; padding: 12px 14px; border-left: 3px solid #6f8a34; background: #f6faef; border-radius: 0 10px 10px 0; }
+.seller-reply-label { font-family: 'Space Grotesk', sans-serif; font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #4b601d; margin-bottom: 6px; }
+.seller-reply-text { font-size: 13px; color: #2f3820; line-height: 1.5; }
+.seller-reply-date { margin-top: 6px; font-size: 11px; color: #8c9a73; }
 .review-empty { text-align: center; padding: 24px 0; font-family: 'Space Grotesk', sans-serif; font-size: 12px; color: #b3a496; letter-spacing: 0.1em; }
 
 @media (max-width: 640px) {
@@ -1060,8 +1058,8 @@ nav {
 <script>
 const IS_LOGGED_IN = <?= $isAnyLoggedIn ? 'true' : 'false' ?>;
 const USER_ID = <?= ($isUserLoggedIn || $isOwnerLoggedIn) ? (int)($isUserLoggedIn ? $_SESSION['user_id'] : $_SESSION['owner_id']) : 0 ?>;
-const emojiMap = { berat:'🍛', ringan:'🧆', minuman:'🧋', dessert:'🧇' };
-const labelMap = { berat:'Makanan Berat', ringan:'Makanan Ringan', minuman:'Minuman', dessert:'Dessert' };
+const emojiMap = { berat:'🍛', ringan:'🧆', minuman:'🧋', dessert:'🧆' };
+const labelMap = { berat:'Makanan Berat', ringan:'Jajanan Ringan', minuman:'Minuman', dessert:'Jajanan Ringan' };
 const btnAddTray = document.getElementById('btnAddTray');
 let currentTrayItem = null;
 
@@ -1221,6 +1219,41 @@ let reviewStarVal = 0;
 const itemOverlay    = document.getElementById('itemOverlay');
 const itemModalClose = document.getElementById('itemModalClose');
 
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  }[ch]));
+}
+
+function renderSellerReply(rv) {
+  if (!rv.reply_text) return '';
+  return `
+    <div class="seller-reply">
+      <div class="seller-reply-label">Balasan Seller</div>
+      <div class="seller-reply-text">${escapeHtml(rv.reply_text)}</div>
+      ${rv.reply_date ? `<div class="seller-reply-date">Diperbarui: ${escapeHtml(rv.reply_date)}</div>` : ''}
+    </div>
+  `;
+}
+
+function renderReviewItem(rv) {
+  return `
+    <div class="review-item">
+      <div class="ri-top">
+        <span class="ri-name">${escapeHtml(rv.nama)}</span>
+        <span class="ri-date">${escapeHtml(rv.waktu)}</span>
+      </div>
+      <div class="ri-stars">${[1,2,3,4,5].map(i=>`<span style="color:${i<=Number(rv.rating)?'#111':'#ddd'}">★</span>`).join('')}</div>
+      <div class="ri-komentar">${escapeHtml(rv.komentar)}</div>
+      ${renderSellerReply(rv)}
+    </div>
+  `;
+}
+
 function openItemModal(menuId, nama, harga, kategori, foto) {
   currentItemId = menuId;
   reviewStarVal = 0;
@@ -1235,7 +1268,7 @@ function openItemModal(menuId, nama, harga, kategori, foto) {
   document.getElementById('reviewCount').textContent = '0 reviews';
   document.getElementById('reviewList').innerHTML = '<div class="review-empty">Memuat reviews...</div>';
   btnAddTray.disabled = false;
-  btnAddTray.textContent = 'Tambahkan keranjang';
+  btnAddTray.textContent = '🛒 Tambahkan keranjang';
 
   // Set foto
   const imgEl = document.getElementById('itemModalImg');
@@ -1280,16 +1313,7 @@ function openItemModal(menuId, nama, harga, kategori, foto) {
       if (data.reviews.length === 0) {
         document.getElementById('reviewList').innerHTML = '<div class="review-empty">No reviews yet. Be the first to review!</div>';
       } else {
-        document.getElementById('reviewList').innerHTML = data.reviews.map(rv => `
-          <div class="review-item">
-            <div class="ri-top">
-              <span class="ri-name">${rv.nama}</span>
-              <span class="ri-date">${rv.waktu}</span>
-            </div>
-           <div class="ri-stars">${[1,2,3,4,5].map(i=>`<span style="color:${i<=Number(rv.rating)?'#111':'#ddd'}">★</span>`).join('')}</div>
-            <div class="ri-komentar">${rv.komentar}</div>
-          </div>
-        `).join('');
+        document.getElementById('reviewList').innerHTML = data.reviews.map(renderReviewItem).join('');
       }
     }).catch(() => {});
 }
@@ -1412,11 +1436,7 @@ function submitReview() {
     document.getElementById('reviewCount').textContent = `${data.total} reviews`;
     // Prepend review baru
     const rv = data.review;
-    const newItem = `<div class="review-item">
-      <div class="ri-top"><span class="ri-name">${rv.nama}</span><span class="ri-date">${rv.waktu}</span></div>
-      <div class="ri-stars">${[1,2,3,4,5].map(i=>`<span style="color:${i<=Number(rv.rating)?'#111':'#ddd'}">★</span>`).join('')}</div>
-      <div class="ri-komentar">${rv.komentar}</div>
-    </div>`;
+    const newItem = renderReviewItem(rv);
     const rl = document.getElementById('reviewList');
     if (rl.querySelector('.review-empty')) rl.innerHTML = newItem;
     else rl.insertAdjacentHTML('afterbegin', newItem);

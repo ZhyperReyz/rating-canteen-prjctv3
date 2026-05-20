@@ -1,7 +1,5 @@
 <?php
-// -- Mulai session jika belum aktif --
 if (session_status() === PHP_SESSION_NONE) session_start();
-// -- Load dependency utama --
 require_once 'config.php';
 
 if (isset($_SESSION['user_id']))   { header('Location: page2.php'); exit; }
@@ -10,7 +8,6 @@ if (isset($_SESSION['owner_id']))  { header('Location: owner_panel.php'); exit; 
 
 $error = '';
 $role  = $_POST['role'] ?? 'user';
-// -- Cek akses atau request masuk --
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email    = trim($_POST['email'] ?? '');
@@ -21,7 +18,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Isi semua field ya!';
     } else {
         if ($role === 'user') {
-          // -- Siapkan query database --
             $stmt = $conn->prepare("SELECT id, nama, password FROM users WHERE email = ?");
             $stmt->bind_param('s', $email); $stmt->execute();
             $acc = $stmt->get_result()->fetch_assoc(); $stmt->close();
@@ -32,7 +28,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else { $error = 'Email atau password salah.'; }
 
         } elseif ($role === 'seller') {
-          // -- Siapkan query database --
             $stmt = $conn->prepare("SELECT id, nama, password, status FROM sellers WHERE email = ?");
             $stmt->bind_param('s', $email); $stmt->execute();
             $acc = $stmt->get_result()->fetch_assoc(); $stmt->close();
@@ -131,9 +126,9 @@ body.mode-owner .back-menu{
 .auth-box.mode-owner{background:#0f0f1a;border-color:#1e1e33;}
 .auth-logo{display:flex;align-items:center;gap:10px;margin-bottom:28px;font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:0.06em;color:#244a31;text-decoration:none;}
 .auth-box.mode-seller .auth-logo,.auth-box.mode-owner .auth-logo{color:#c8e6c9;}
-.logo-icon{width:36px;height:36px;border-radius:10px;background:transparent;box-shadow:0 10px 24px rgba(55,32,20,0.25);display:flex;align-items:center;justify-content:center;font-size:16px;overflow:hidden;}
-.logo-icon img{width:100%;height:100%;object-fit:contain;display:block;background:transparent;}
-.auth-box.mode-seller .logo-icon,.auth-box.mode-owner .logo-icon{background:transparent;}
+.logo-icon{width:36px;height:36px;background:#111;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:16px;color:#a8d08d;}
+.auth-box.mode-seller .logo-icon{background:#fff;}
+.auth-box.mode-owner .logo-icon{background:#243b2b;}
 .auth-logo .sub{color:#6b8f74;font-size:11px;display:block;}
 /* Role Tabs */
 .role-tabs{display:flex;margin-bottom:28px;border:1.5px solid #c8dbca;overflow:hidden;}
@@ -186,18 +181,18 @@ body.mode-owner .back-menu{
 <div class="auth-box mode-<?= $role ?>" id="authBox">
 
   <a href="index.php" class="auth-logo">
-    <div class="logo-icon"><img src="assets/img/logosmkn-transparent.png" alt="SMKN 1 Surabaya"></div>
-    <div><span>SMKN 1 SURABAYA</span><span class="sub">Kantin</span></div>
+    <div class="logo-icon">🍽️</div>
+    <div><span>School</span><span class="sub">Cafeteria</span></div>
   </a>
 
   <div class="role-tabs">
-    <button type="button" class="role-tab <?= $role==='user'?'active':'' ?>" onclick="setRole('user',this)">User</button>
-    <button type="button" class="role-tab <?= $role==='seller'?'active':'' ?>" onclick="setRole('seller',this)">Seller</button>
-    <button type="button" class="role-tab <?= $role==='owner'?'active':'' ?>" onclick="setRole('owner',this)">Owner</button>
+    <button type="button" class="role-tab <?= $role==='user'?'active':'' ?>" onclick="setRole('user',this)">👤 User</button>
+    <button type="button" class="role-tab <?= $role==='seller'?'active':'' ?>" onclick="setRole('seller',this)">🏪 Seller</button>
+    <button type="button" class="role-tab <?= $role==='owner'?'active':'' ?>" onclick="setRole('owner',this)">👑 Owner</button>
   </div>
 
   <div class="pending-info" id="pendingInfo">
-    Akun seller baru perlu di-approve owner dulu sebelum bisa login.
+    ⏳ Akun seller baru perlu di-approve owner dulu sebelum bisa login.
   </div>
 
   <h1 class="auth-title" id="authTitle">
@@ -236,7 +231,6 @@ body.mode-owner .back-menu{
 </div>
 
 <script>
-  // — Fungsi manajemen form login dan validasi role — 
 const titles  = {user:'Login', seller:'Seller Login', owner:'Owner Login'};
 const subs    = {user:'Masuk untuk kasih rating & review!', seller:'Masuk ke dashboard penjual', owner:'Akses panel owner'};
 const footers = {
@@ -250,7 +244,6 @@ function setRole(role, el) {
   document.querySelectorAll('.role-tab').forEach(t => t.classList.remove('active'));
   el.classList.add('active');
   const box = document.getElementById('authBox');
-  // — Akhir script interaksi form login multi-role — 
   const body = document.getElementById('loginBody');
   ['mode-user','mode-seller','mode-owner'].forEach(c => { box.classList.remove(c); body.classList.remove(c); });
   box.classList.add('mode-'+role);
